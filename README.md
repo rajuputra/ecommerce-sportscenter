@@ -16,10 +16,17 @@
 <summary><b>Click to expand screenshots</b></summary>
 
 ### 🏠 Home Page (Premium Hero Section)
-![Home Page](screenshots/screencapture-localhost-3000-2026-05-10-02_36_47.png)
+| Light Mode | Dark Mode |
+|------------|-----------|
+| ![Home Light](screenshots/screencapture-localhost-3000-2026-05-10-02_36_47.png) | ![Home Dark](screenshots/darkmode%20home%20page.png) |
 
-### 🛒 Product Catalog (Filtering & Sorting)
-![Store](screenshots/screencapture-localhost-3000-store-2026-05-10-02_37_07.png)
+### 🛒 Product Catalog & Card Design
+| Store Catalog (Dark Mode) | Premium Product Card (Light Mode) |
+|---------------------------|-----------------------------------|
+| ![Store Dark](screenshots/store%20dark%20mode.png) | ![Product Card](screenshots/product%20card.png) |
+
+### 📞 Contact Page (Dark Mode)
+![Contact Dark](screenshots/contact%20dark%20mode.png)
 
 ### 🔑 Secure Authentication
 ![Login](screenshots/screencapture-localhost-3000-login-2026-05-10-02_37_30.png)

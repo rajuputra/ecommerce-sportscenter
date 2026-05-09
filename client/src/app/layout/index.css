@@ -1,0 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap');
+
+html, body {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    scroll-behavior: smooth;
+    overflow-y: scroll;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Custom Toastify Styles for Sporty Theme */
+.Toastify__toast {
+    border-radius: 12px !important;
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 500;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+    backdrop-filter: blur(10px);
+}
+
+.Toastify__toast--error {
+    background: rgba(220, 38, 38, 0.95) !important;
+    color: white !important;
+}
+
+.Toastify__toast--success {
+    background: rgba(16, 185, 129, 0.95) !important;
+    color: white !important;
+}
+
+.Toastify__toast--info {
+    background: rgba(59, 130, 246, 0.95) !important;
+    color: white !important;
+}

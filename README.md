@@ -12,33 +12,46 @@
 
 ## 📸 Project Showcases
 
-<details>
-<summary><b>Click to expand screenshots</b></summary>
+<details open>
+<summary><b>Click to toggle visibility of screenshots</b></summary>
 
 ### 🏠 Home Page (Premium Hero Section)
 | Light Mode | Dark Mode |
 |------------|-----------|
-| ![Home Light](screenshots/screencapture-localhost-3000-2026-05-10-02_36_47.png) | ![Home Dark](screenshots/darkmode%20home%20page.png) |
+| ![Home Light](screenshots/home%20light%20mode.png) | ![Home Dark](screenshots/darkmode%20home%20page.png) |
 
-### 🛒 Product Catalog & Card Design
-| Store Catalog (Dark Mode) | Premium Product Card (Light Mode) |
-|---------------------------|-----------------------------------|
-| ![Store Dark](screenshots/store%20dark%20mode.png) | ![Product Card](screenshots/product%20card.png) |
+### 🛒 Product Catalog (Store)
+| Light Mode | Dark Mode |
+|------------|-----------|
+| ![Store Light](screenshots/store%20light%20mode.png) | ![Store Dark](screenshots/store%20dark%20mode.png) |
 
-### 📞 Contact Page (Dark Mode)
-![Contact Dark](screenshots/contact%20dark%20mode.png)
+### 📞 Contact Page
+| Light Mode | Dark Mode |
+|------------|-----------|
+| ![Contact Light](screenshots/contact%20light%20mode.png) | ![Contact Dark](screenshots/contact%20dark%20mode.png) |
 
-### 🔑 Secure Authentication
-![Login](screenshots/screencapture-localhost-3000-login-2026-05-10-02_37_30.png)
+---
 
-### 🛍️ Shopping Basket
-![Basket](screenshots/screencapture-localhost-3000-basket-2026-05-10-02_38_36.png)
+### 🛍️ Shopping Experience
+| Premium Product Card | Interactive Shopping Cart |
+|----------------------|--------------------------|
+| ![Product Card](screenshots/product%20card.png) | ![Shopping Cart](screenshots/shopping%20card.png) |
 
-### 💳 Modern Checkout Flow
-![Checkout](screenshots/screencapture-localhost-3000-checkout-2026-05-10-02_38_49.png)
+---
 
-### 📋 Order History
-![Orders](screenshots/screencapture-localhost-3000-orders-2026-05-10-02_40_08.png)
+### 💳 Checkout & Order Flow
+| 🔑 Secure Login | 📦 Shipping Details |
+|-----------------|---------------------|
+| ![Login](screenshots/login%20page.png) | ![Checkout](screenshots/checkout%20page.png) |
+
+| 📝 Order Review | 💳 Secure Payment |
+|-----------------|-------------------|
+| ![Review](screenshots/review%20order%20page.png) | ![Payment](screenshots/payment%20page.png) |
+
+| 📋 Order History | ✅ Success Confirmation |
+|------------------|-------------------------|
+| ![Orders](screenshots/myorder%20page.png) | ![Success](screenshots/after%20order.png) |
+
 </details>
 
 ---
@@ -93,7 +106,7 @@
 - **Redis**
 
 ### Setup Backend
-1. Configure your MySQL database in `src/main/resources/application.properties`.
+1. Configure your MySQL database in `src/main/resources/application.yaml`.
 2. Run the Spring Boot application:
    ```bash
    ./mvnw spring-boot:run

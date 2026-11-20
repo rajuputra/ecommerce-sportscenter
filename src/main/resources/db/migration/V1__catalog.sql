@@ -1,15 +1,3 @@
--- -----------------------------------------------------
--- Schema full-stack-sports-center
--- -----------------------------------------------------
-CREATE DATABASE IF NOT EXISTS `sports-center`;
-
-USE `sports-center` ;
-
--- Drop existing tables if they exist
-DROP TABLE IF EXISTS Product;
-DROP TABLE IF EXISTS Type;
-DROP TABLE IF EXISTS Brand;
-
 -- Create the Brand table
 CREATE TABLE `Brand` (
                          `Id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -44,7 +32,7 @@ CREATE TABLE `Product` (
                            `Id` INT AUTO_INCREMENT PRIMARY KEY,
                            `Name` VARCHAR(255) NOT NULL,
                            `Description` TEXT,
-                           `Price` DECIMAL(12, 2) NOT NULL,
+                           `Price` BIGINT NOT NULL,
                            `PictureUrl` VARCHAR(255),
                            `ProductTypeId` INT NOT NULL,
                            `ProductBrandId` INT NOT NULL,

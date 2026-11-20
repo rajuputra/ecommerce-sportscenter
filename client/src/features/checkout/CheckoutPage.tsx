@@ -1,308 +1,142 @@
-import {
-  Box,
-  Button,
-  Paper,
-  Step,
-  StepLabel,
-  Stepper,
-  Typography,
-} from "@mui/material";
-import {
-  LocalShipping as LocalShippingIcon,
-  CheckCircleOutline as CheckCircleIcon,
-  ShoppingBag as ShoppingBagIcon,
-} from "@mui/icons-material";
-import { useState } from "react";
-import AddressForm from "./AddressForm";
-import PaymentForm from "./PaymentForm";
-import Review from "./Review";
+import { Check } from "@mui/icons-material";
+import { Alert, Box, Button, Stack } from "@mui/material";
+import { LoadingButton } from "@mui/lab";
 import { FormProvider, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-
-import { BasketItem } from "../../app/models/basket";
-import { toast } from "react-toastify";
-import agent from "../../app/api/agent";
-import { useAppDispatch } from "../../app/store/configureStore";
-import { setBasket } from "../basket/basketSlice";
-import { ValidationRules } from "./validationRules";
-import { LoadingButton } from "@mui/lab";
-import { useNavigate } from "react-router-dom";
-
-const steps = ["Shipping address", "Review your order", "Payment details"];
-
-function getStepContent(step: number) {
-  switch (step) {
-    case 0:
-      return <AddressForm />;
-    case 1:
-      return <Review />;
-    case 2:
-      return <PaymentForm />;
-    default:
-      throw new Error("Unknown step");
-  }
-}
+import { useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import agent, { errorMessage, errorStatus } from "../../app/api/agent";
+import { useAppDispatch, useAppSelector } from "../../app/store/configureStore";
+import AddressForm from "./AddressForm";
+import Review from "./Review";
+import { addressSchema, type AddressFields } from "./validationRules";
 
 export default function CheckoutPage() {
-  const [activeStep, setActiveStep] = useState(0);
-  const [orderNumber, setOrderNumber] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const currentValdationRule = ValidationRules[activeStep];
-  const methods = useForm({
-    mode: "all",
-    resolver: yupResolver(currentValdationRule),
-  });
+  const basket = useAppSelector(state => state.basket.basket);
   const dispatch = useAppDispatch();
-  const navigate = useNavigate();
+  const [review, setReview] = useState(false);
+  const [orderId, setOrderId] = useState<number>();
+  const [busy, setBusy] = useState(false);
+  const [conflict, setConflict] = useState(false);
+  const [error, setError] = useState("");
+  const inFlight = useRef(false);
+  const methods = useForm<AddressFields>({ resolver: yupResolver(addressSchema) });
 
-  const handleNext = async () => {
-    const isValid = await methods.trigger();
-    if (isValid) {
-      const data: any = methods.getValues();
-      if (activeStep === steps.length - 1) {
-        const basket = await agent.Basket.get();
-        if (basket) {
-          const subTotal = calculateSubTotal(basket.items);
-          const deliveryFee = 35000;
-
-          try {
-            setLoading(true);
-            const orderDto = {
-              basketId: basket.id,
-              shippingAddress: {
-                name: data.firstName + " " + data.lastName,
-                address1: data.address1,
-                address2: data.address2 || "",
-                city: data.city,
-                state: data.state,
-                zipCode: data.zip,
-                country: data.country,
-              },
-              subTotal: Math.round(subTotal),
-              deliveryFee: deliveryFee,
-              orderDate: new Date().toISOString(),
-            };
-
-            const orderId = await agent.Orders.create(orderDto);
-            setOrderNumber(orderId);
-            setActiveStep(activeStep + 1);
-            agent.Basket.deleteBasket(basket.id);
-            dispatch(setBasket(null));
-            localStorage.removeItem("basket_id");
-            localStorage.removeItem("basket");
-          } catch (error) {
-            console.error("Error submitting the order:", error);
-            toast.error("Failed to submit the order. Please try again.");
-          } finally {
-            setLoading(false);
-          }
-        } else {
-          console.error("Basket not found in local storage.");
-          toast.error("Your cart is empty.");
-        }
-      } else {
-        setActiveStep(activeStep + 1);
-      }
+  async function placeOrder(data: AddressFields) {
+    if (!review) {
+      setReview(true);
+      return;
     }
-  };
+    if (!basket || inFlight.current || conflict) return;
+    inFlight.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      const id = await agent.Orders.create({
+        basketId: basket.id,
+        shippingAddress: {
+          name: `${data.firstName} ${data.lastName}`,
+          address1: data.address1,
+          address2: data.address2,
+          city: data.city,
+          state: data.state,
+          zipCode: data.zip,
+          country: data.country,
+        },
+        items: basket.items.map(item => ({ productId: item.id, quantity: item.quantity, unitPrice: item.price })),
+      });
+      setOrderId(id);
+      await agent.Basket.clear(basket.id, dispatch);
+    } catch (error) {
+      setConflict(errorStatus(error) === 409);
+      setError(errorMessage(error, "Could not confirm the order. You can safely retry."));
+    } finally {
+      setBusy(false);
+      inFlight.current = false;
+    }
+  }
 
-  const handleBack = () => {
-    setActiveStep(activeStep - 1);
-  };
+  async function refreshBasket() {
+    if (!basket || inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
+    try {
+      const items = await Promise.all(basket.items.map(async (item) => {
+        try {
+          const product = await agent.Store.details(item.id);
+          return { ...product, quantity: Math.min(item.quantity, product.stock) };
+        } catch (error) {
+          if (errorStatus(error) === 404) return null;
+          throw error;
+        }
+      }));
+      await agent.Basket.replace(items.flatMap(item => item && item.quantity > 0 ? [item] : []), dispatch);
+      setConflict(false);
+      setError("");
+    } catch {
+      setError("Could not refresh the basket. Try again.");
+    } finally {
+      setBusy(false);
+      inFlight.current = false;
+    }
+  }
 
-  const calculateSubTotal = (items: BasketItem[]): number => {
-    return items.reduce((total, item) => total + item.price * item.quantity, 0);
-  };
+  if (orderId) return (
+    <div className="av-page">
+      <section className="av-panel av-empty av-confirmation" aria-live="polite">
+        <span className="av-confirmation-icon"><Check /></span>
+        <h1 className="av-display">ORDER PLACED.</h1>
+        <p>Demo order #{orderId}. No payment or delivery.</p>
+        <Link className="av-action" to={`/orders/${orderId}`}>View order</Link>
+        <Link className="av-text-link" to="/store">Continue shopping</Link>
+      </section>
+    </div>
+  );
+
+  if (!basket) return (
+    <div className="av-page">
+      <section className="av-panel av-empty">
+        <h1 className="av-display">YOUR BAG IS EMPTY.</h1>
+        <Link className="av-action" to="/store">Back to the shop</Link>
+      </section>
+    </div>
+  );
 
   return (
-    <FormProvider {...methods}>
-      <Box sx={{ pb: 8 }}>
-        <Typography
-          variant="h3"
-          fontWeight="bold"
-          sx={{ mb: { xs: 2, md: 4 }, fontSize: { xs: "1.75rem", sm: "2.5rem", md: "3rem" } }}
-        >
-          Checkout
-        </Typography>
-
-        {/* Stepper */}
-        <Paper
-          elevation={0}
-          sx={{
-            p: { xs: 1.5, sm: 2, md: 4 },
-            borderRadius: { xs: 3, md: 4 },
-            bgcolor: (theme) =>
-              theme.palette.mode === "light"
-                ? "#f5f5f5"
-                : "rgba(255, 255, 255, 0.05)",
-            mb: { xs: 2, md: 4 },
-            overflow: "hidden",
-          }}
-        >
-          <Stepper
-            activeStep={activeStep}
-            alternativeLabel
-            sx={{
-              "& .MuiStepLabel-root .Mui-completed": {
-                color: "secondary.main",
-              },
-              "& .MuiStepLabel-root .Mui-active": {
-                color: "secondary.main",
-              },
-              "& .MuiStepConnector-line": {
-                borderTopWidth: 3,
-              },
-              "& .MuiStepConnector-root.Mui-active .MuiStepConnector-line": {
-                borderColor: "secondary.main",
-              },
-              "& .MuiStepConnector-root.Mui-completed .MuiStepConnector-line": {
-                borderColor: "secondary.main",
-              },
-            }}
-          >
-            {steps.map((label) => (
-              <Step key={label}>
-                <StepLabel
-                  sx={{
-                    "& .MuiStepLabel-label": {
-                      fontWeight: "bold",
-                      mt: 1,
-                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                    },
-                  }}
-                >
-                  {label}
-                </StepLabel>
-              </Step>
-            ))}
-          </Stepper>
-        </Paper>
-
-        {/* Content */}
-        {activeStep === steps.length ? (
-          /* Success state */
-          <Paper
-            elevation={0}
-            sx={{
-              p: { xs: 4, md: 6 },
-              borderRadius: 4,
-              bgcolor: (theme) =>
-                theme.palette.mode === "light"
-                  ? "#f5f5f5"
-                  : "rgba(255, 255, 255, 0.05)",
-              textAlign: "center",
-            }}
-          >
-            <CheckCircleIcon
-              sx={{ fontSize: { xs: 56, md: 80 }, color: "success.main", mb: 2 }}
-            />
-            <Typography variant="h4" fontWeight="bold" gutterBottom
-              sx={{ fontSize: { xs: "1.4rem", sm: "1.75rem", md: "2.125rem" } }}
-            >
-              Thank you for your order!
-            </Typography>
-            <Typography
-              variant="body1"
-              color="text.secondary"
-              sx={{ mb: 1, maxWidth: 500, mx: "auto" }}
-            >
-              Your order has been placed successfully.
-            </Typography>
-            <Typography
-              variant="h6"
-              color="secondary.main"
-              fontWeight="bold"
-              sx={{ mb: 4 }}
-            >
-              Order #{orderNumber}
-            </Typography>
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ mb: 4, maxWidth: 500, mx: "auto" }}
-            >
-              We have emailed your order confirmation and will send you an
-              update when your order has shipped.
-            </Typography>
-            <Box sx={{ display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap", flexDirection: { xs: "column", sm: "row" } }}>
-              <Button
-                variant="contained"
-                color="secondary"
-                size="large"
-                startIcon={<ShoppingBagIcon />}
-                onClick={() => navigate("/orders")}
-                sx={{ borderRadius: 2, px: 4, py: 1.5, fontWeight: "bold", width: { xs: "100%", sm: "auto" } }}
-              >
-                View Orders
-              </Button>
-              <Button
-                variant="outlined"
-                color="inherit"
-                size="large"
-                startIcon={<LocalShippingIcon />}
-                onClick={() => navigate("/store")}
-                sx={{ borderRadius: 2, px: 4, py: 1.5, fontWeight: "bold", width: { xs: "100%", sm: "auto" } }}
-              >
-                Continue Shopping
-              </Button>
-            </Box>
-          </Paper>
-        ) : (
-          /* Step content */
-          <Paper
-            elevation={0}
-            sx={{
-              p: { xs: 2, sm: 3, md: 4 },
-              borderRadius: { xs: 3, md: 4 },
-              bgcolor: (theme) =>
-                theme.palette.mode === "light"
-                  ? "#f5f5f5"
-                  : "rgba(255, 255, 255, 0.05)",
-            }}
-          >
-            {getStepContent(activeStep)}
-
-            {/* Navigation buttons */}
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                mt: 4,
-                pt: 3,
-                borderTop: "1px solid",
-                borderColor: "divider",
-              }}
-            >
-              <Button
-                onClick={handleBack}
-                disabled={activeStep === 0}
-                sx={{
-                  fontWeight: "bold",
-                  visibility: activeStep === 0 ? "hidden" : "visible",
-                }}
-              >
-                Back
-              </Button>
-              <LoadingButton
-                loading={loading}
-                variant="contained"
-                color="secondary"
-                onClick={handleNext}
-                size="large"
-                sx={{
-                  px: { xs: 3, md: 4 },
-                  py: 1.5,
-                  borderRadius: 2,
-                  fontWeight: "bold",
-                  minWidth: { xs: 120, md: 160 },
-                }}
-              >
-                {activeStep === steps.length - 1 ? "Place Order" : "Next"}
-              </LoadingButton>
-            </Box>
-          </Paper>
-        )}
-      </Box>
-    </FormProvider>
+    <div className="av-page av-checkout">
+      <div className="av-page-intro"><h1 className="av-display">CHECKOUT.</h1></div>
+      <Alert severity="info">This is a demo. Use a sample address. No payment or delivery will take place.</Alert>
+      <ol className="av-steps" aria-label="Checkout steps">
+        <li aria-current={review ? undefined : "step"}><span>{review ? <Check fontSize="small" /> : "1"}</span> Shipping address</li>
+        <li aria-current={review ? "step" : undefined}><span>2</span> Review order</li>
+      </ol>
+      <div className="av-checkout-layout">
+      <section className="av-panel av-checkout-form" aria-label={review ? "Confirm address" : "Shipping address"}>
+        <FormProvider {...methods}>
+          <Box component="form" onSubmit={methods.handleSubmit(placeOrder)} noValidate>
+            {review ? <div className="av-address-review">
+              <h2>Shipping address</h2>
+              <address>
+                {methods.getValues("firstName")} {methods.getValues("lastName")}<br />
+                {methods.getValues("address1")}<br />
+                {methods.getValues("address2") && <>{methods.getValues("address2")}<br /></>}
+                {methods.getValues("city")}, {methods.getValues("state")} {methods.getValues("zip")}<br />
+                {methods.getValues("country")}
+              </address>
+            </div> : <AddressForm />}
+            {error && <Alert sx={{ mt: 2 }} severity="error">{error}</Alert>}
+            <Stack direction="row" justifyContent="space-between" sx={{ mt: 3 }}>
+              {review ? <Button color="secondary" disabled={busy} onClick={() => setReview(false)}>Edit address</Button>
+                : <Button color="secondary" component={Link} to="/basket">Back to bag</Button>}
+              {review && conflict ?
+                <LoadingButton loading={busy} variant="contained" onClick={refreshBasket}>Refresh basket</LoadingButton> :
+                <LoadingButton loading={busy} type="submit" variant="contained">{review ? "Place demo order" : "Review order"}</LoadingButton>}
+            </Stack>
+          </Box>
+        </FormProvider>
+      </section>
+      <aside className="av-panel av-summary" aria-label="Order summary"><Review /></aside>
+      </div>
+    </div>
   );
 }

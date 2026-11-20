@@ -11,8 +11,7 @@ import SignInPage from "../../features/account/SignInPage";
 import RegisterPage from "../../features/account/RegisterPage";
 import RequireAuth from "./RequireAuth";
 import RequireGuest from "./RequireGuest";
-import CheckoutPage from "../../features/checkout/CheckoutPage";
-import Order from "../../features/orders/Order";
+import RequireAdmin from "./RequireAdmin";
 
 export const router = createBrowserRouter([
   {
@@ -22,8 +21,23 @@ export const router = createBrowserRouter([
       {
         element: <RequireAuth />,
         children: [
-          { path: "checkout", element: <CheckoutPage /> },
-          { path: "orders", element: <Order /> },
+          { path: "checkout", lazy: async () => ({ Component: (await import("../../features/checkout/CheckoutPage")).default }) },
+          { path: "orders", lazy: async () => ({ Component: (await import("../../features/orders/Order")).default }) },
+          { path: "orders/:id", lazy: async () => ({ Component: (await import("../../features/orders/OrderDetails")).default }) },
+          {
+            element: <RequireAdmin />,
+            children: [
+              { path: "admin", lazy: async () => ({ Component: (await import("../../features/admin/AdminPage")).default }) },
+              { path: "admin/orders", lazy: async () => {
+                const { default: Orders } = await import("../../features/orders/Order");
+                return { Component: () => <Orders admin /> };
+              } },
+              { path: "admin/orders/:id", lazy: async () => {
+                const { default: Detail } = await import("../../features/orders/OrderDetails");
+                return { Component: () => <Detail admin /> };
+              } },
+            ],
+          },
         ],
       },
       {

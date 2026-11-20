@@ -1,0 +1,29 @@
+.av-account-page .av-breadcrumb { margin-bottom: 9px; }
+.av-account-page .av-auth { grid-template-columns: 1.05fr 1fr; border-radius: 6px; }
+.av-auth-campaign {
+  position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: end;
+  padding: clamp(22px, 4vw, 60px); color: #faf9ed;
+  background: linear-gradient(0deg, #101411ed 0%, #10141158 40%, transparent 66%);
+}
+.av-auth-campaign > span { font-weight: 750; font-size: .76rem; letter-spacing: .16em; }
+.av-auth-campaign p { margin: 10px 0 0; font: 800 clamp(55px, 8vw, 115px)/.77 var(--av-display); }
+.av-auth-campaign em { color: var(--av-volt); }
+.av-auth-content { max-width: 440px; width: 100%; margin-inline: auto; }
+.av-auth-body .av-auth-content .av-display { font-size: clamp(46px, 5.5vw, 75px); margin: 0 0 10px; }
+.av-auth-description { margin: 0 0 20px; color: var(--av-muted); font-size: .94rem; }
+.av-auth-form { display: grid; gap: 13px; }
+.av-auth-form .MuiLoadingButton-root { min-height: 49px; margin-top: 4px; }
+.av-auth-switch { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 2px 14px;
+  border-top: 1px solid var(--av-rule); margin-top: 20px; padding-top: 8px; color: var(--av-muted); font-size: .85rem; }
+.av-auth-switch a { display: inline-flex; min-height: 44px; align-items: center; gap: 5px; font-weight: 650; color: var(--av-text); }
+.av-password-rules { background: var(--av-canvas); border: 1px solid var(--av-rule); border-radius: 5px; padding: 10px 12px; }
+.av-password-rules p { display: flex; justify-content: space-between; gap: 10px; margin: 0 0 6px; font-size: .78rem; font-weight: 650; }
+.av-password-rules ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.av-password-rules li { display: flex; align-items: center; gap: 7px; font-size: .78rem; color: var(--av-muted); }
+.av-password-rules li[data-met="true"] { color: var(--av-text); }
+.av-password-rules li svg { width: 16px; height: 16px; }
+.av-password-rules li[data-met="true"] svg { color: #426212; }
+[data-theme="dark"] .av-password-rules li[data-met="true"] svg { color: var(--av-volt); }
+@media (max-width: 759px) {
+  .av-account-page .av-auth { grid-template-columns: 1fr; }
+}

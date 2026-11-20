@@ -1,7 +1,6 @@
 package com.ecommerce.sportscenter.entity.OrderAggregate;
 
 public enum OrderStatus {
-    Pending,
-    PaymentReceived,
-    PaymentFailed
+    Pending, Processing, Shipped, Completed, Cancelled,
+    PaymentReceived, PaymentFailed
 }

@@ -1,21 +1,14 @@
-import * as yup from 'yup';
+import * as yup from "yup";
 
-export const ValidationRules = [
-    yup.object({
-        firstName: yup.string().required('Fist name is required'),
-        lastName: yup.string().required('Last name is required'),
-        address1: yup.string().required('Address1 is required'),
-        address2: yup.string().optional(),
-        city: yup.string().required('City name is required'),
-        state: yup.string().required('State name is required'),
-        zip: yup.string().required('Zip is required'),
-        country: yup.string().required('Country name is required'),
-    }),
-    yup.object(),
-    yup.object({
-        cardName: yup.string().required(),
-        cardNumber: yup.string().required(),
-        expDate: yup.string().required(),
-        cvv: yup.string().required()
-    })
-]
+export const addressSchema = yup.object({
+  firstName: yup.string().trim().max(59).required("First name is required"),
+  lastName: yup.string().trim().max(60).required("Last name is required"),
+  address1: yup.string().trim().max(200).required("Address is required"),
+  address2: yup.string().trim().max(200).default(""),
+  city: yup.string().trim().max(100).required("City is required"),
+  state: yup.string().trim().max(100).required("Province is required"),
+  zip: yup.string().trim().max(20).required("Postal code is required"),
+  country: yup.string().trim().max(100).required("Country is required"),
+});
+
+export type AddressFields = yup.InferType<typeof addressSchema>;

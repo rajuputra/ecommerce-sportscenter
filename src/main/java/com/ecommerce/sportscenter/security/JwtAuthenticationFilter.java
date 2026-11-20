@@ -1,67 +1,41 @@
 package com.ecommerce.sportscenter.security;
 
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.extern.log4j.Log4j2;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-import org.springframework.stereotype.Component;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-@Component
-@Log4j2
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-    private final JwtHelper jwtHelper;
+    private final JwtHelper jwt;
+    private final UserDetailsService users;
 
-    private final UserDetailsService userDetailsService;
-
-    public JwtAuthenticationFilter(JwtHelper jwtHelper, UserDetailsService userDetailsService) {
-        this.jwtHelper = jwtHelper;
-        this.userDetailsService = userDetailsService;
+    public JwtAuthenticationFilter(JwtHelper jwt, UserDetailsService users) {
+        this.jwt = jwt;
+        this.users = users;
     }
 
-
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        String requestHeader = request.getHeader("Authorization");
-        log.info("Header: {}", requestHeader);
-        String username = null;
-        String token = null;
-        if(requestHeader!=null && requestHeader.startsWith("Bearer")){
-            token = requestHeader.substring(7);
-            try{
-                username = this.jwtHelper.getUserNameFromToken(token);
-
-            }
-            catch (IllegalArgumentException | ExpiredJwtException | MalformedJwtException e){
-                log.info("Jwt Token Processing Error");
-                e.printStackTrace();
-            }
-        }else {
-            log.warn("JWT token doesn't start with Bearer String");
-        }
-        if(username!=null && SecurityContextHolder.getContext().getAuthentication() == null){
-            // Fetch user details
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
-            Boolean validateToken = this.jwtHelper.validateToken(token, userDetails);
-            if(validateToken){
-                //set the authentication
-                UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authenticationToken);
-            }else {
-                log.info("Token is not valid!");
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+            throws ServletException, IOException {
+        String authorization = request.getHeader("Authorization");
+        if (authorization != null && authorization.startsWith("Bearer ")) {
+            try {
+                var user = users.loadUserByUsername(jwt.subject(authorization.substring(7)));
+                var authentication = UsernamePasswordAuthenticationToken.authenticated(
+                        user, null, user.getAuthorities());
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            } catch (JwtException | IllegalArgumentException | UsernameNotFoundException ignored) {
+                SecurityContextHolder.clearContext();
             }
         }
-        filterChain.doFilter(request, response);
+        chain.doFilter(request, response);
     }
 }

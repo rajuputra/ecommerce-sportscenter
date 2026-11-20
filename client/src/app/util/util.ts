@@ -1,16 +1,8 @@
-import { Basket } from "../models/basket";
+export const rupiah = new Intl.NumberFormat("id-ID", {
+  style: "currency", currency: "IDR", maximumFractionDigits: 0,
+});
 
-export function getBasketFromLocalStorage():Basket | null{
-    const storedBasket = localStorage.getItem('basket');
-    if (storedBasket){
-        try{
-            const parsedBasket: Basket = JSON.parse(storedBasket);
-            return parsedBasket;
-        }
-        catch(error){
-            console.error('Error Parsing basket from local storage: ', error);
-            return null;
-        }
-    }
-    return null;
+export function productImage(value?: string | null) {
+  const filename = value?.split("/").pop();
+  return filename ? `/images/products/${encodeURIComponent(filename)}` : undefined;
 }

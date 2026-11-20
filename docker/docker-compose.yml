@@ -1,26 +1,22 @@
-version: '3.1'
+name: sportscenter-local
 
 services:
-  sportscenter-mysql:
-    image: mysql
-    restart: always
-    container_name: "sports-center-mysql"
+  mysql:
+    image: mysql:8.4.10
     environment:
-      MYSQL_ROOT_PASSWORD: 'admin'
+      MYSQL_DATABASE: sports-center
+      MYSQL_USER: sportscenter
+      MYSQL_PASSWORD: ${SPORTSCENTER_DB_PASSWORD:?Set SPORTSCENTER_DB_PASSWORD}
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
     ports:
-      - "3306:3306"
+      - "127.0.0.1:${SPORTSCENTER_DB_PORT:-13376}:3306"
     volumes:
-      - ./data.sql:/docker-entrypoint-initdb.d/data.sql
-      - sports-center-mysql-data:/var/lib/mysql
-
-  sportscenter-redis:
-    image: "redis:latest"
-    container_name: "sports-center-redis-container"
-    ports:
-      - "6379:6379"
-    volumes:
-      - sports-center-redis-data:/data
+      - db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -u\"$$MYSQL_USER\" -p\"$$MYSQL_PASSWORD\" -e 'SELECT 1' > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
 volumes:
-  sports-center-redis-data:
-  sports-center-mysql-data:
+  db:

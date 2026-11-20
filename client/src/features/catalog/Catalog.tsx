@@ -1,352 +1,120 @@
-import { useState, useEffect, ChangeEvent } from "react";
-import { Product } from "../../app/models/product";
-import ProductList from "./ProductList";
-import agent from "../../app/api/agent";
+import { useEffect, useState } from "react";
+import { Alert, Box, Button, MenuItem, Pagination, Stack, TextField, Typography } from "@mui/material";
+import { useSearchParams } from "react-router-dom";
+import agent, { type Page } from "../../app/api/agent";
+import type { Product } from "../../app/models/product";
+import type { Brand } from "../../app/models/brand";
+import type { Type } from "../../app/models/type";
 import Spinner from "../../app/layout/Spinner";
-import {
-  Box,
-  FormControl,
-  FormControlLabel,
-  FormLabel,
-  Grid,
-  Pagination,
-  Paper,
-  Radio,
-  RadioGroup,
-  TextField,
-  Typography,
-  InputAdornment,
-  Drawer,
-  Button,
-  IconButton,
-} from "@mui/material";
-import {
-  Search as SearchIcon,
-  FilterList as FilterListIcon,
-  Close as CloseIcon,
-} from "@mui/icons-material";
-import { Brand } from "../../app/models/brand";
-import { Type } from "../../app/models/type";
+import ProductList from "./ProductList";
 
-const sortOptions = [
-  { value: "asc", label: "Ascending" },
-  { value: "desc", label: "Descending" },
+const sorts = [
+  { value: "name:asc", label: "Name A–Z" },
+  { value: "name:desc", label: "Name Z–A" },
+  { value: "price:asc", label: "Price: low to high" },
+  { value: "price:desc", label: "Price: high to low" },
 ];
+
 export default function Catalog() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useSearchParams();
+  const keyword = (query.get("q") ?? "").slice(0, 100);
+  const [draft, setDraft] = useState(keyword);
+  const page = Math.max(1, Number.parseInt(query.get("page") ?? "1", 10) || 1);
+  const brandId = Number(query.get("brand")) || undefined;
+  const typeId = Number(query.get("type")) || undefined;
+  const selectedSort = sorts.find(option => option.value === query.get("sort"))?.value ?? "name:asc";
+  const [sort, order] = selectedSort.split(":");
   const [brands, setBrands] = useState<Brand[]>([]);
   const [types, setTypes] = useState<Type[]>([]);
-  const [selectedSort, setSelectedSort] = useState("asc");
-  const [selectedBrand, setSelectedBrand] = useState("All");
-  const [selectedType, setSelectedType] = useState("All");
-  const [selectedBrandId, setSelectedBrandId] = useState(0);
-  const [selectedTypeId, setSelectedTypeId] = useState(0);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [totalItems, setTotaItems] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const [result, setResult] = useState<Page<Product>>();
+  const [error, setError] = useState("");
+  const [filterError, setFilterError] = useState(false);
+  const [reload, setReload] = useState(0);
 
-  // useEffect(()=>{
-  //   agent.Store.list()
-  //   .then((products)=>setProducts(products.content))
-  //   .catch(error=>console.log(error))
-  //   .finally(()=>setLoading(false));
-  // }, []);
+  useEffect(() => { setDraft(keyword); }, [keyword]);
   useEffect(() => {
-    Promise.all([
-      agent.Store.list(currentPage, pageSize),
-      agent.Store.brands(),
-      agent.Store.types(),
-    ])
-      .then(([productsRes, brandsResp, typesResp]) => {
-        setProducts(productsRes.content);
-        setTotaItems(productsRes.totalElements);
-        setBrands(brandsResp);
-        setTypes(typesResp);
+    let active = true;
+    setFilterError(false);
+    Promise.all([agent.Store.brands(), agent.Store.types()]).then(([brands, types]) => {
+      if (active) {
+        setBrands(brands);
+        setTypes(types);
+      }
+    }).catch(() => { if (active) setFilterError(true); });
+    return () => { active = false; };
+  }, [reload]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setResult(undefined);
+    setError("");
+    agent.Store.list(page, 12, { keyword, brandId, typeId, sort, order }, controller.signal)
+      .then(data => {
+        if (controller.signal.aborted) return;
+        const lastPage = Math.max(1, data.page.totalPages);
+        if (page > lastPage) {
+          setQuery(previous => {
+            const next = new URLSearchParams(previous);
+            next.set("page", String(lastPage));
+            return next;
+          }, { replace: true });
+        } else setResult(data);
       })
-      .catch((error) => console.error(error))
-      .finally(() => setLoading(false));
-  }, [currentPage, pageSize]);
-  const loadProducts = (selectedSort: string, searchKeyword = "") => {
-    setLoading(true);
-    let page = currentPage - 1;
-    let size = pageSize;
-    let brandId = selectedBrandId !== 0 ? selectedBrandId : undefined;
-    let typeId = selectedTypeId !== 0 ? selectedTypeId : undefined;
-    const sort = "name";
-    const order = selectedSort === "desc" ? "desc" : "asc";
-    //construct the url
-    let url = `${agent.Store.apiUrl}?sort=${sort}&order=${order}`;
-    if (brandId !== undefined || typeId !== undefined) {
-      url += "&";
-      if (brandId !== undefined) url += `brandId=${brandId}&`;
-      if (typeId !== undefined) url += `typeId=${typeId}&`;
-      //Remove trailing &
-      url = url.replace(/&$/, "");
-    }
-    //Make the API request with the url
-    if (searchKeyword) {
-      console.log(searchKeyword);
-      agent.Store.search(searchKeyword)
-        .then((productsRes) => {
-          setProducts(productsRes.content);
-          setTotaItems(productsRes.length);
-        })
-        .catch((error) => console.error(error))
-        .finally(() => setLoading(false));
-    } else {
-      agent.Store.list(page, size, undefined, undefined, url)
-        .then((productsRes) => {
-          setProducts(productsRes.content);
-          setTotaItems(productsRes.totalElements);
-        })
-        .catch((error) => console.error(error))
-        .finally(() => setLoading(false));
-    }
-  };
-  //Trigger loadProducts wheneever selectedBrandId or selectedTypeId changes
-  useEffect(() => {
-    loadProducts(selectedSort);
-  }, [selectedBrandId, selectedTypeId]);
+      .catch(() => { if (!controller.signal.aborted) setError("Could not load the catalog."); });
+    return () => controller.abort();
+  }, [page, keyword, brandId, typeId, sort, order, reload, setQuery]);
 
-  const handleSortChange = (event: any) => {
-    const selectedSort = event.target.value;
-    setSelectedSort(selectedSort);
-    loadProducts(selectedSort);
-  };
-
-  const handleBrandChange = (event: any) => {
-    const selectedBrand = event.target.value;
-    const brand = brands.find((b) => b.name === selectedBrand);
-    setSelectedBrand(selectedBrand);
-    if (brand) {
-      setSelectedBrandId(brand.id);
-      loadProducts(selectedSort);
-    }
-  };
-
-  const handleTypeChange = (event: any) => {
-    const selectedType = event.target.value;
-    const type = types.find((t) => t.name === selectedType);
-    setSelectedType(selectedType);
-    if (type) {
-      setSelectedTypeId(type.id);
-      loadProducts(selectedSort);
-    }
-  };
-  const handlePageChange = (event: any, page: number) => {
-    setCurrentPage(page);
-  };
-
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-
-  if (!products) return <h3>Unable to load Products</h3>;
-  if (loading) return <Spinner message="Loading Products..." />;
-  const filterPaperStyle = {
-    mb: 3,
-    p: 3,
-    borderRadius: 3,
-    bgcolor: (theme: any) =>
-      theme.palette.mode === "light" ? "#f5f5f5" : "rgba(255, 255, 255, 0.05)",
-    boxShadow: "none",
-  };
-
-  const filtersContent = (
-    <>
-      <Paper sx={filterPaperStyle}>
-        <FormControl>
-          <FormLabel
-            id="sort-by-name-label"
-            sx={{ fontWeight: "bold", color: "text.primary", mb: 1 }}
-          >
-            Sort by Name
-          </FormLabel>
-          <RadioGroup
-            aria-label="sort-by-name"
-            name="sort-by-name"
-            value={selectedSort}
-            onChange={handleSortChange}
-          >
-            {sortOptions.map(({ value, label }) => (
-              <FormControlLabel
-                key={value}
-                value={value}
-                control={<Radio color="secondary" />}
-                label={label}
-              />
-            ))}
-          </RadioGroup>
-        </FormControl>
-      </Paper>
-      <Paper sx={filterPaperStyle}>
-        <FormControl>
-          <FormLabel
-            id="brands-label"
-            sx={{ fontWeight: "bold", color: "text.primary", mb: 1 }}
-          >
-            Brands
-          </FormLabel>
-          <RadioGroup
-            aria-label="brands"
-            name="brands"
-            value={selectedBrand}
-            onChange={handleBrandChange}
-          >
-            {brands.map((brand) => (
-              <FormControlLabel
-                key={brand.id}
-                value={brand.name}
-                control={<Radio color="secondary" />}
-                label={brand.name}
-              />
-            ))}
-          </RadioGroup>
-        </FormControl>
-      </Paper>
-      <Paper sx={filterPaperStyle}>
-        <FormControl>
-          <FormLabel
-            id="types-label"
-            sx={{ fontWeight: "bold", color: "text.primary", mb: 1 }}
-          >
-            Types
-          </FormLabel>
-          <RadioGroup
-            aria-label="types"
-            name="types"
-            value={selectedType}
-            onChange={handleTypeChange}
-          >
-            {types.map((type) => (
-              <FormControlLabel
-                key={type.id}
-                value={type.name}
-                control={<Radio color="secondary" />}
-                label={type.name}
-              />
-            ))}
-          </RadioGroup>
-        </FormControl>
-      </Paper>
-    </>
-  );
+  function change(key: string, value: string) {
+    const next = new URLSearchParams(query);
+    if (key !== "page") next.delete("page");
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setQuery(next);
+  }
 
   return (
-    <Box sx={{ pt: { xs: 4, md: 6 }, pb: 8 }}>
-      <Grid container spacing={4}>
-        <Grid item xs={12} md={3}>
-          <Paper
-            sx={{
-              mb: 3,
-              borderRadius: 3,
-              boxShadow: "none",
-            }}
-          >
-            <TextField
-              label="Search products"
-              variant="outlined"
-              fullWidth
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  loadProducts(selectedSort, searchTerm);
-                }
-              }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-                sx: {
-                  borderRadius: 3,
-                  bgcolor: (theme) =>
-                    theme.palette.mode === "light"
-                      ? "#f5f5f5"
-                      : "rgba(255, 255, 255, 0.05)",
-                },
-              }}
-            />
-          </Paper>
-          
-          <Box sx={{ display: { xs: "none", md: "block" } }}>
-            {filtersContent}
-          </Box>
-        </Grid>
-
-        <Grid item xs={12} md={9}>
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: { xs: "column", sm: "row" },
-              justifyContent: "space-between",
-              alignItems: "center",
-              mb: 3,
-              gap: 2,
-            }}
-          >
-            <Typography variant="subtitle1" fontWeight="bold" color="text.secondary">
-              Displaying {(currentPage - 1) * pageSize + 1}-
-              {Math.min(currentPage * pageSize, totalItems)} of {totalItems} items
-            </Typography>
-
-            <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-              <Button
-                variant="outlined"
-                color="secondary"
-                startIcon={<FilterListIcon />}
-                onClick={() => setMobileFiltersOpen(true)}
-                sx={{ display: { xs: "flex", md: "none" }, borderRadius: 8 }}
-              >
-                Filters
-              </Button>
-              <Pagination
-                count={Math.ceil(totalItems / pageSize)}
-                color="secondary"
-                onChange={handlePageChange}
-                page={currentPage}
-                shape="rounded"
-              />
-            </Box>
-          </Box>
-
-          <ProductList products={products} />
-
-          <Box mt={6} mb={2} display="flex" justifyContent="center">
-            <Pagination
-              count={Math.ceil(totalItems / pageSize)}
-              color="secondary"
-              size="large"
-              onChange={handlePageChange}
-              page={currentPage}
-              shape="rounded"
-            />
-          </Box>
-        </Grid>
-      </Grid>
-
-      <Drawer
-        anchor="right"
-        open={mobileFiltersOpen}
-        onClose={() => setMobileFiltersOpen(false)}
-        PaperProps={{
-          sx: { width: { xs: "85%", sm: 350 }, p: 3, pt: 4 },
-        }}
-      >
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-          <Typography variant="h5" fontWeight="bold">
-            Filters
-          </Typography>
-          <IconButton onClick={() => setMobileFiltersOpen(false)}>
-            <CloseIcon />
-          </IconButton>
-        </Box>
-        <Box sx={{ overflowY: "auto", pb: 4 }}>
-          {filtersContent}
-        </Box>
-      </Drawer>
-    </Box>
+    <Stack spacing={2} className="av-page">
+      <div className="av-page-intro">
+        <h1 className="av-display">SHOP THE GEAR.</h1>
+        <p>Find court shoes, rackets, footballs, and bags for your next game.</p>
+      </div>
+      {types.length > 0 && <div className="av-shop-categories" aria-label="Shop categories" role="group">
+        <button type="button" aria-pressed={!typeId} onClick={() => change("type", "")}>All gear</button>
+        {types.map(type => <button type="button" key={type.id} aria-pressed={type.id === typeId}
+          onClick={() => change("type", String(type.id))}>{type.name === "Shoes" ? "Court shoes" : type.name}</button>)}
+      </div>}
+      <div className="av-shop-tools av-panel">
+      <Box component="form" className="av-shop-search"
+        onSubmit={event => { event.preventDefault(); change("q", draft.trim()); }}>
+        <TextField fullWidth size="small" label="Search products" value={draft}
+          inputProps={{ maxLength: 100 }} onChange={event => setDraft(event.target.value)} />
+        <Button type="submit" variant="contained">Search</Button>
+      </Box>
+      <div className="av-shop-filters">
+        <TextField select size="small" label="Brand" value={brands.some(brand => brand.id === brandId) ? brandId : ""} onChange={event => change("brand", event.target.value)}>
+          <MenuItem value="">All brands</MenuItem>
+          {brands.map(brand => <MenuItem key={brand.id} value={brand.id}>{brand.name}</MenuItem>)}
+        </TextField>
+        <TextField select size="small" label="Type" value={types.some(type => type.id === typeId) ? typeId : ""} onChange={event => change("type", event.target.value)}>
+          <MenuItem value="">All types</MenuItem>
+          {types.map(type => <MenuItem key={type.id} value={type.id}>{type.name}</MenuItem>)}
+        </TextField>
+        <TextField select size="small" label="Sort" value={selectedSort} onChange={event => change("sort", event.target.value)}>
+          {sorts.map(option => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}
+        </TextField>
+        <Button onClick={() => { setDraft(""); setQuery({}); }}>Reset</Button>
+      </div>
+      </div>
+      {filterError && <Alert severity="warning" action={<Button onClick={() => setReload(value => value + 1)}>Retry</Button>}>Could not load filters.</Alert>}
+      {error ? <Alert severity="error" action={<Button onClick={() => setReload(value => value + 1)}>Retry</Button>}>{error}</Alert> :
+        !result ? <Spinner message="Loading products..." /> :
+        !result.content.length ? <Alert severity="info">No products match your search.</Alert> : <>
+          <Typography color="text.secondary" role="status">{result.page.totalElements} products</Typography>
+          <ProductList products={result.content} />
+          {result.page.totalPages > 1 && <Box sx={{ alignSelf: "center" }}>
+            <Pagination count={result.page.totalPages} page={page} onChange={(_, value) => change("page", String(value))} />
+          </Box>}
+        </>}
+    </Stack>
   );
 }

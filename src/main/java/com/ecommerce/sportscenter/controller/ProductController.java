@@ -12,7 +12,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
+import jakarta.validation.constraints.*;
+import org.springframework.web.server.ResponseStatusException;
+import java.util.Set;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -46,17 +48,19 @@ public class ProductController {
     @GetMapping()
 
     public ResponseEntity<Page<ProductResponse>> getProducts(
-            @RequestParam(name = "page", defaultValue = "0") int page,
-            @RequestParam(name = "size", defaultValue = "10") int size,
-            @RequestParam(name = "keyword", required = false) String keyword,
+            @RequestParam(name = "page", defaultValue = "0") @Min(0) int page,
+            @RequestParam(name = "size", defaultValue = "10") @Min(1) @Max(100) int size,
+            @RequestParam(name = "keyword", required = false) @Size(max = 100) String keyword,
             @RequestParam(name = "brandId", required = false) Integer brandId,
             @RequestParam(name = "typeId", required = false) Integer typeId,
             @RequestParam(name = "sort", defaultValue = "name") String sort,
             @RequestParam(name = "order", defaultValue = "asc") String order
     ){
-        //Convert order to Sort direction
+        if (!Set.of("name", "price").contains(sort) || !Set.of("asc", "desc").contains(order)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported sort");
+        }
         Sort.Direction direction = order.equalsIgnoreCase("desc") ? Sort.Direction.DESC: Sort.Direction.ASC;
-        Sort sorting = Sort.by(direction, sort);
+        Sort sorting = Sort.by(direction, sort).and(Sort.by("id"));
         Pageable pageable = PageRequest.of(page, size, sorting);
 
         Page<ProductResponse> productResponses = productService.getProducts(pageable, brandId, typeId, keyword);

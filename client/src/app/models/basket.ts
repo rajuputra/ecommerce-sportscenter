@@ -8,13 +8,9 @@ export interface BasketItem {
     name: string
     description: string
     price: number
+    stock?: number
     pictureUrl: string
     productBrand: string
     productType: string
     quantity: number
-}
-export interface BasketTotals {
-    shipping: number;
-    subTotal: number;
-    total: number;
 }

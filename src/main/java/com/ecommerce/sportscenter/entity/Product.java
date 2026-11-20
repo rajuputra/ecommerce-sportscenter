@@ -27,6 +27,17 @@ public class Product {
     @Column(name = "Price")
     private Long price;
 
+    @Column(name = "Stock", nullable = false)
+    private int stock;
+
+    @Column(name = "Active", nullable = false)
+    @Builder.Default
+    private boolean active = true;
+
+    @Version
+    @Column(name = "Version", nullable = false)
+    private long version;
+
     @Column(name = "PictureUrl")
     private String pictureUrl;
 

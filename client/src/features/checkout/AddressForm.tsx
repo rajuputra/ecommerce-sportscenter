@@ -16,7 +16,7 @@ export default function AddressForm() {
         </Typography>
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Enter the address where you want your order delivered.
+        Enter a sample shipping address for this demo.
       </Typography>
       <Grid container spacing={3}>
         <Grid item xs={12} sm={6}>

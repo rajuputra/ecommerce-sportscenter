@@ -1,146 +1,93 @@
-import axios, { AxiosError, AxiosResponse } from "axios";
-import { router } from "../router/Routes";
-import { toast } from "react-toastify";
+import axios from "axios";
 import basketService from "./basketService";
-import { Dispatch } from "redux";
-import { Product } from "../models/product";
-import type { Basket } from "../models/basket";
+import type { Product } from "../models/product";
+import type { Brand } from "../models/brand";
+import type { Type } from "../models/type";
+import type { Checkout, Order, OrderDetail, OrderStatus } from "../models/order";
+import type { Credentials, Profile, Registration, User } from "../models/user";
 
-axios.defaults.baseURL ='http://localhost:8081/api/';
-
-const responseBody = (response: AxiosResponse) => response.data;
-
-axios.interceptors.response.use(async response=>{
-    return response
-}, (error: AxiosError)=>{
-    const {status} = error.response as AxiosResponse; 
-    switch(status){
-        case 404:
-            toast.error("Resource not found");
-            router.navigate('/not-found');
-            break;
-        case 500:
-            toast.error("Internal server error occurred");
-            router.navigate('/server-error');
-            break;
-        default:
-            break;
-    }
-    return Promise.reject(error.message);
-})
-
-axios.interceptors.request.use((config) => {
-    const userString = localStorage.getItem('user');
-    if (userString) {
-        const user = JSON.parse(userString);
-        if (user?.token) {
-            config.headers.Authorization = `Bearer ${user.token}`;
-        }
-    }
-    return config;
-})
-
-const requests = {
-    get: (url: string) => axios.get(url).then(responseBody),
-    post: (url: string, body: object) => axios.post(url, body).then(responseBody),
-    put: (url: string, body: object) =>axios.put(url, body).then(responseBody),
-    delete: (url: string) =>axios.put(url).then(responseBody)
+export interface Page<T> {
+  content: T[];
+  page: { totalElements: number; totalPages: number };
 }
 
-const Store = {
-    apiUrl: 'http://localhost:8081/api/products',
-    list:(page: number, size: number, brandId?: number, typeId?: number, url?: string)=> {
-      let requestUrl = url || `products?page=${page-1}&size=${size}`;
-      if(brandId!==undefined){
-        requestUrl += `&brandId=${brandId}`;
-      }
-      if(typeId!==undefined){
-        requestUrl += `&typeId=${typeId}`;
-      }
-      return requests.get(requestUrl);
+export interface AdminProduct {
+  id?: number;
+  version?: number;
+  name: string;
+  description: string;
+  price: number;
+  stock: number;
+  pictureUrl: string;
+  brandId: number;
+  typeId: number;
+  active: boolean;
+}
+
+const http = axios.create({ baseURL: "/api/" });
+
+export function authToken() {
+  return sessionStorage.getItem("sportscenter-token");
+}
+
+export function storeToken(token: string | null) {
+  if (token) sessionStorage.setItem("sportscenter-token", token);
+  else sessionStorage.removeItem("sportscenter-token");
+}
+
+http.interceptors.request.use((config) => {
+  const token = authToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+http.interceptors.response.use(undefined, (error) => {
+  const token = authToken();
+  if (axios.isAxiosError(error) && error.response?.status === 401 && token &&
+      error.config?.headers.Authorization === `Bearer ${token}` && error.config.url !== "auth/login") {
+    storeToken(null);
+    window.dispatchEvent(new Event("sportscenter-session-expired"));
+  }
+  return Promise.reject(error);
+});
+
+export function errorMessage(error: unknown, fallback: string) {
+  if (!axios.isAxiosError(error)) return fallback;
+  return error.response?.data?.detail || fallback;
+}
+
+export function errorStatus(error: unknown) {
+  return axios.isAxiosError(error) ? error.response?.status : undefined;
+}
+
+export default {
+  Store: {
+    list: (page: number, size: number, filters?: { keyword: string; brandId?: number; typeId?: number; sort: string; order: string }, signal?: AbortSignal) =>
+      http.get<Page<Product>>("products", { params: { page: page - 1, size, ...filters }, signal }).then(response => response.data),
+    details: (id: number) => http.get<Product>(`products/${id}`).then(response => response.data),
+    brands: () => http.get<Brand[]>("products/brands").then(response => response.data),
+    types: () => http.get<Type[]>("products/types").then(response => response.data),
+  },
+  Basket: basketService,
+  Account: {
+    login: (values: Credentials) => http.post<User>("auth/login", values).then(response => response.data),
+    register: (values: Registration) => http.post("auth/register", values),
+    profile: () => http.get<Profile>("auth/user").then(response => response.data),
+  },
+  Orders: {
+    list: (page: number) => http.get<Page<Order>>("orders", { params: { page: page - 1 } }).then(response => response.data),
+    fetch: (id: number) => http.get<OrderDetail>(`orders/${id}`).then(response => response.data),
+    create: (values: Checkout) => http.post<number>("orders", values).then(response => response.data),
+    cancel: (id: number) => http.post(`orders/${id}/cancel`),
+  },
+  Admin: {
+    products: (page: number) => http.get<Page<AdminProduct>>("admin/products", { params: { page: page - 1 } }).then(response => response.data),
+    saveProduct: (product: AdminProduct) => {
+      const { id, ...values } = product;
+      return id ? http.put(`admin/products/${id}`, values) : http.post("admin/products", values);
     },
-    details:(id: number) => requests.get(`products/${id}`),
-    types: () => requests.get('products/types').then(types => [{ id: 0, name: 'All' }, ...types]),
-    brands: () => requests.get('products/brands').then(brands => [{ id: 0, name: 'All' }, ...brands]),
-    search: (keyword: string) => requests.get(`products?keyword=${keyword}`)
+    orders: (page: number) => http.get<Page<Order>>("admin/orders", { params: { page: page - 1 } }).then(response => response.data),
+    order: (id: number) => http.get<OrderDetail>(`admin/orders/${id}`).then(response => response.data),
+    status: (id: number, status: OrderStatus) => http.patch(`admin/orders/${id}/status`, { status }),
+  },
 };
-
-const Basket = {
-    get: async() => {
-        try{
-            return await basketService.getBasket();
-        }catch(error){
-            console.error("Failed to get Basket: ", error);
-            throw error;
-        }
-    },
-    addItem: async(product: Product, dispatch: Dispatch)=>{
-        try{
-            const result = await basketService.addItemToBasket(product, 1, dispatch);
-            console.log(result);
-            return result;
-        }catch(error){
-            console.error("Failed to add new item to basket:", error);
-            throw error;
-        }
-    },
-    removeItem: async (itemId: number, dispatch: Dispatch)=>{
-        try{
-            await basketService.remove(itemId, dispatch);
-        }catch(error){
-            console.error("Failed to remove an item from basket:", error);
-            throw error;
-        }
-    },
-    incrementItemQuantity: async (itemId: number, quantity: number = 1, dispatch: Dispatch) => {
-        try {
-          await basketService.incrementItemQuantity(itemId, quantity, dispatch);
-        } catch (error) {
-          console.error("Failed to increment item quantity in basket:", error);
-          throw error;
-        }
-      },
-      decrementItemQuantity: async (itemId: number, quantity: number = 1, dispatch: Dispatch) => {
-        try {
-          await basketService.decrementItemQuantity(itemId, quantity, dispatch);
-        } catch (error) {
-          console.error("Failed to decrement item quantity in basket:", error);
-          throw error;
-        }
-      },
-      setBasket: async (basket: Basket, dispatch: Dispatch) => {
-        try {
-          await basketService.setBasket(basket, dispatch);
-        } catch (error) {
-          console.error("Failed to set basket:", error);
-          throw error;
-        }
-      },
-      deleteBasket: async(basketId: string) =>{
-        try{
-          await basketService.deleteBasket(basketId);
-        } catch(error){
-          console.log("Failed to delete the Basket");
-          throw error;
-        }
-      }
-}
-
-const Account = {
-  login: (values:any) =>requests.post('auth/login', values)
-}
-
-const Orders ={
-  list:() => requests.get('orders'),
-  fetch:(id:number) => requests.get(`orders/${id}`),
-  create:(values:any) => requests.post('orders', values)
-}
-
-const agent = {
-    Store,
-    Basket,
-    Account,
-    Orders
-}
-
-export default agent;

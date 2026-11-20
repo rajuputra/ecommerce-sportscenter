@@ -1,24 +1,19 @@
-
 server:
-  port: 8081
+  port: ${PORT:8081}
 
 spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/sports-center
-    username: root
-    password: admin
   application:
     name: SportsCenter
+  datasource:
+    url: ${SPORTSCENTER_DB_URL:jdbc:mysql://127.0.0.1:13376/sports-center}
+    username: ${SPORTSCENTER_DB_USER:sportscenter}
+    password: ${SPORTSCENTER_DB_PASSWORD:}
   jpa:
+    open-in-view: false
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
       naming:
         physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.MySQLDialect
-        format_sql: true
-data:
-  redis:
-    host: localhost
-    port: 6379
+  mvc:
+    problemdetails:
+      enabled: true

@@ -1,197 +1,53 @@
-import {
-  Avatar,
-  Button,
-  Card,
-  CardActions,
-  CardContent,
-  CardHeader,
-  CardMedia,
-  Typography,
-  Chip,
-  Box,
-  CircularProgress,
-} from "@mui/material";
-import { ShoppingCart } from "@mui/icons-material";
-import { Product } from "../../app/models/product";
+import { Add, ArrowOutward, Check } from "@mui/icons-material";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useState } from "react";
-import { useAppDispatch } from "../../app/store/configureStore";
+import { toast } from "react-toastify";
 import agent from "../../app/api/agent";
-import { setBasket } from "../basket/basketSlice";
-import { LoadingButton } from "@mui/lab";
+import type { Product } from "../../app/models/product";
+import { useAppDispatch, useAppSelector } from "../../app/store/configureStore";
+import { productImage, rupiah } from "../../app/util/util";
 
-interface Props {
-  product: Product;
-}
-
-export default function ProductCard({ product }: Props) {
-  const extractImageName = (item: Product): string | null => {
-    if (item && item.pictureUrl) {
-      const parts = item.pictureUrl.split("/");
-      if (parts.length > 0) {
-        return parts[parts.length - 1];
-      }
-    }
-    return null;
-  };
-  const formatPrice = (price: number): string => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(price);
-  };
-  const [loading, setLoading] = useState(false);
+export default function ProductCard({ product }: { product: Product }) {
   const dispatch = useAppDispatch();
-  function addItem() {
-    setLoading(true);
-    agent.Basket.addItem(product, dispatch)
-      .then((response) => {
-        console.log("New Basket:", response.basket);
-        dispatch(setBasket(response.basket));
-      })
-      .catch((error) => console.log(error))
-      .finally(() => setLoading(false));
+  const [added, setAdded] = useState(false);
+  const timer = useRef<number>();
+  const inBag = useAppSelector(state => state.basket.basket?.items.find(item => item.id === product.id)?.quantity ?? 0);
+  const unavailable = product.stock === 0;
+  const atLimit = inBag >= Math.min(product.stock, 99);
+
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  async function add() {
+    try {
+      await agent.Basket.addItem(product, dispatch);
+      setAdded(true);
+      window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(() => setAdded(false), 1000);
+      toast.success("Added to your bag");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not add to your bag.");
+    }
   }
+
   return (
-    <Card
-      sx={{
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        transition: "all 0.3s ease-in-out",
-        "&:hover": {
-          transform: "translateY(-8px)",
-          boxShadow: (theme) =>
-            theme.palette.mode === "light"
-              ? "0px 12px 24px rgba(0, 0, 0, 0.1)"
-              : "0px 12px 24px rgba(0, 0, 0, 0.6)",
-        },
-      }}
-    >
-      <CardHeader
-        avatar={
-          <Avatar sx={{ bgcolor: "secondary.main", fontWeight: "bold" }}>
-            {product.name.charAt(0).toUpperCase()}
-          </Avatar>
-        }
-        title={product.name}
-        titleTypographyProps={{
-          sx: {
-            fontWeight: "bold",
-            color: "text.primary",
-            noWrap: true,
-            width: "100%",
-          },
-        }}
-      />
-      <Box
-        sx={{
-          bgcolor: (theme) =>
-            theme.palette.mode === "light" ? "#f5f5f5" : "white",
-          p: (theme) => (theme.palette.mode === "light" ? 2 : 1),
-          mx: (theme) => (theme.palette.mode === "light" ? 0 : 2),
-          mt: (theme) => (theme.palette.mode === "light" ? 0 : 1),
-          borderRadius: (theme) => (theme.palette.mode === "light" ? 0 : 3),
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          height: 200,
-          overflow: "hidden",
-        }}
-      >
-        <CardMedia
-          sx={{
-            height: "100%",
-            width: "100%",
-            backgroundSize: "contain",
-            mixBlendMode: (theme) =>
-              theme.palette.mode === "light" ? "multiply" : "normal",
-          }}
-          image={"/images/products/" + extractImageName(product)}
-          title={product.name}
-        />
-      </Box>
-      <CardContent sx={{ flexGrow: 1 }}>
-        <Typography
-          gutterBottom
-          color="secondary.main"
-          variant="h5"
-          sx={{ fontWeight: "bold", mb: 2 }}
-        >
-          {formatPrice(product.price)}
-        </Typography>
-        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <Chip
-            size="small"
-            label={product.productBrand}
-            variant="outlined"
-            color="primary"
-          />
-          <Chip
-            size="small"
-            label={product.productType}
-            variant="outlined"
-            color="secondary"
-          />
-        </Box>
-      </CardContent>
-      <CardActions
-        sx={{
-          p: 1.5,
-          pt: 0,
-          gap: 1,
-          display: "flex",
-          justifyContent: "space-between",
-        }}
-      >
-        <LoadingButton
-          loading={loading}
-          onClick={addItem}
-          size="medium"
-          variant="contained"
-          color="secondary"
-          startIcon={
-            loading ? <CircularProgress size={20} color="inherit" /> : <ShoppingCart />
-          }
-          aria-label={`Tambahkan ${product.name} ke keranjang`}
-          sx={{
-            flexGrow: 1,
-            fontWeight: "bold",
-            borderRadius: "8px",
-            minHeight: 44,
-            px: { xs: 1, sm: 3 },
-            textTransform: "none",
-            fontSize: { xs: "0.85rem", sm: "0.95rem" },
-            whiteSpace: "nowrap",
-            boxShadow: "0 4px 14px 0 rgba(0,0,0,0.1)",
-            "&:hover": {
-              boxShadow: "0 6px 20px 0 rgba(0,0,0,0.15)",
-            }
-          }}
-        >
-          Add to cart
-        </LoadingButton>
-        <Button
-          component={Link}
-          to={`/store/${product.id}`}
-          size="medium"
-          variant="outlined"
-          color="primary"
-          aria-label={`Lihat detail ${product.name}`}
-          sx={{
-            minWidth: "auto",
-            minHeight: 44,
-            borderRadius: "8px",
-            px: { xs: 1.5, sm: 3 },
-            textTransform: "none",
-            fontWeight: "bold",
-            whiteSpace: "nowrap",
-          }}
-        >
-          View
-        </Button>
-      </CardActions>
-    </Card>
+    <article className="av-product">
+      <Link className="av-product-link" to={`/store/${product.id}`}>
+        <div className="av-product-media">
+          <img src={productImage(product.pictureUrl)} alt="" loading="lazy" decoding="async" />
+          <span className="av-product-category">{unavailable ? "Out of stock" : product.productType}</span>
+          <span className="av-product-arrow"><ArrowOutward fontSize="small" /></span>
+        </div>
+        <div className="av-product-info">
+          <span className="av-product-brand">{product.productBrand}</span>
+          <h3>{product.name}</h3>
+          <span className="av-product-price">{rupiah.format(product.price)}</span>
+        </div>
+      </Link>
+      <button className="av-product-add" type="button" onClick={() => void add()} disabled={atLimit}
+        title={unavailable ? "Out of stock" : atLimit ? "Stock limit reached" : "Add to bag"}
+        aria-label={`Add ${product.name} to bag`}>
+        {added ? <Check fontSize="small" /> : <Add fontSize="small" />}
+      </button>
+    </article>
   );
 }

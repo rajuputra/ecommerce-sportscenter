@@ -1,4 +1,4 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import { Basket } from "../../app/models/basket";
 
 
@@ -14,8 +14,7 @@ export const basketSlice = createSlice({
     name:'basket',
     initialState, 
     reducers:{
-        setBasket: (state, action) =>{
-            console.log('new basket state', action.payload);
+        setBasket: (state, action: PayloadAction<Basket | null>) =>{
             state.basket = action.payload
         }
     }

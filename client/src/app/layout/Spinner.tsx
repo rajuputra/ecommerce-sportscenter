@@ -1,23 +1,9 @@
-import { Backdrop, Box, CircularProgress, Typography } from "@mui/material";
+import { CircularProgress, useMediaQuery } from "@mui/material";
 
-interface Props {
-  message?: string;
-}
-export default function Spinner({ message = "Loading..." }: Props) {
-  return (
-    <Backdrop open={true} invisible={true} sx={{ zIndex: (theme) => theme.zIndex.drawer + 2 }}>
-      <Box
-        display="flex"
-        flexDirection="column"
-        justifyContent="center"
-        alignItems="center"
-        height="100vh"
-      >
-        <CircularProgress size={80} color="secondary" thickness={4} />
-        <Typography variant="h5" sx={{ mt: 3, fontWeight: 'bold', letterSpacing: 2, color: 'secondary.main' }}>
-          {message}
-        </Typography>
-      </Box>
-    </Backdrop>
-  );
+export default function Spinner({ message = "Loading…" }: { message?: string }) {
+  const reduced = useMediaQuery("(prefers-reduced-motion: reduce)");
+  return <div className="av-spinner" role="status">
+    {!reduced && <CircularProgress aria-hidden="true" size={25} thickness={3} color="secondary" />}
+    <span>{message}</span>
+  </div>;
 }

@@ -1,103 +1,65 @@
-import {
-  Container,
-  CssBaseline,
-  Box,
-  Avatar,
-  Typography,
-  TextField,
-  Button,
-  Grid,
-  Link as MuiLink,
-} from "@mui/material";
-import { Link } from "react-router-dom";
-import { LockOutlined as LockOutlinedIcon } from "@mui/icons-material";
+import { Alert, Box, TextField } from "@mui/material";
+import { CheckCircleOutline, RadioButtonUnchecked } from "@mui/icons-material";
+import { visuallyHidden } from "@mui/utils";
+import { LoadingButton } from "@mui/lab";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useForm, useWatch } from "react-hook-form";
 import { useState } from "react";
+import agent, { errorMessage } from "../../app/api/agent";
+import type { Registration } from "../../app/models/user";
+import AccountLayout, { AccountAlternate } from "./AccountLayout";
+import PasswordField from "./PasswordField";
+import { passwordRules, validatePassword } from "./passwordRules";
 
 export default function RegisterPage() {
-  const [formData, setFormData] = useState({
-    username: "",
-    email: "",
-    password: "",
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [error, setError] = useState("");
+  const { control, register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Registration>({
+    mode: "onChange",
+    defaultValues: { password: "" },
   });
+  const password = useWatch({ control, name: "password" });
+  const checklist = passwordRules.map(rule => ({ label: rule.label, met: !!password && rule.check(password) }));
+  const metCount = checklist.filter(rule => rule.met).length;
+  const { ref: passwordRef, ...passwordField } = register("password", { validate: validatePassword });
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-  };
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log(formData);
-  };
+  async function submit(values: Registration) {
+    setError("");
+    try {
+      await agent.Account.register(values);
+      navigate("/login", { replace: true, state: { from: location.state?.from, registered: true } });
+    } catch (error) {
+      setError(errorMessage(error, "Could not register. Please check your details and try again."));
+    }
+  }
+
   return (
-    <Container component="main" maxWidth="xs">
-      <CssBaseline />
-      <Box
-        sx={{
-          marginTop: 8,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
-        <Avatar sx={{ m: 1, bgcolor: "secondary.main" }}>
-          <LockOutlinedIcon />
-        </Avatar>
-        <Typography component="h1" variant="h5">
-          Register
-        </Typography>
-        <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1 }}>
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            id="username"
-            label="Username"
-            name="username"
-            autoComplete="username"
-            autoFocus
-            value={formData.username}
-            onChange={handleChange}
-          />
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            id="email"
-            label="Email Address"
-            name="email"
-            autoComplete="email"
-            value={formData.email}
-            onChange={handleChange}
-          />
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            name="password"
-            label="Password"
-            type="password"
-            id="password"
-            autoComplete="new-password"
-            value={formData.password}
-            onChange={handleChange}
-          />
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            sx={{ mt: 3, mb: 2 }}
-          >
-            Register
-          </Button>
-          <Grid container justifyContent="flex-end">
-            <Grid item>
-              <MuiLink component={Link} to="/login" variant="body2">
-                Already have an account? Sign in
-              </MuiLink>
-            </Grid>
-          </Grid>
-        </Box>
+    <AccountLayout title="Create your account." description="Save your demo orders and come back to check their status.">
+      <Box component="form" className="av-auth-form" onSubmit={handleSubmit(submit)}>
+        {error && <Alert severity="error">{error}</Alert>}
+        <TextField fullWidth required label="Username" autoComplete="username"
+          helperText="3–32 letters, numbers, underscores or hyphens."
+          inputProps={{ minLength: 3, maxLength: 32, pattern: "[a-zA-Z0-9_\\-]+" }} {...register("username")} />
+        <TextField fullWidth required label="Email" type="email" autoComplete="email"
+          inputProps={{ maxLength: 254 }} {...register("email")} />
+        <PasswordField fullWidth required id="register-password" autoComplete="new-password"
+          inputRef={passwordRef} {...passwordField}
+          error={!!errors.password} helperText={errors.password?.message}
+          inputProps={{ "aria-describedby": errors.password ? "password-rules register-password-helper-text" : "password-rules" }} />
+        <div className="av-password-rules" id="password-rules">
+          <p>Password requirements <span role="status">{metCount} of {checklist.length} met</span></p>
+          <ul>
+            {checklist.map(rule => <li key={rule.label} data-met={rule.met}>
+              {rule.met ? <CheckCircleOutline aria-hidden="true" /> : <RadioButtonUnchecked aria-hidden="true" />}
+              <span>{rule.label}</span>
+              <Box component="span" sx={visuallyHidden}>{rule.met ? "Met" : "Not met"}</Box>
+            </li>)}
+          </ul>
+        </div>
+        <LoadingButton fullWidth type="submit" loading={isSubmitting} variant="contained">Create account</LoadingButton>
       </Box>
-    </Container>
+      <AccountAlternate to="/login" state={{ from: location.state?.from }} question="Already registered?" label="Sign in" />
+    </AccountLayout>
   );
 }

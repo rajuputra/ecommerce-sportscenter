@@ -24,9 +24,11 @@ public class ProductServiceImpl implements ProductService{
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public ProductResponse getProductById(Integer productId) {
         log.info("Fetching product by Id: {}", productId);
         Product product = productRepository.findById(productId)
+                .filter(Product::isActive)
                 .orElseThrow(()->new ProductNotFoundException("Product doesn't exist"));
 
         // now convert the product to Product Response
@@ -36,10 +38,11 @@ public class ProductServiceImpl implements ProductService{
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public Page<ProductResponse> getProducts(Pageable pageable, Integer brandId, Integer typeId, String keyword) {
         //Specification<Product> spec = Specification.where(null);
         //Specification<Product> spec = Specification.where((Specification<Product>) null);
-        Specification<Product> spec = (root, query, criteriaBuilder) -> criteriaBuilder.conjunction();
+        Specification<Product> spec = (root, query, criteriaBuilder) -> criteriaBuilder.isTrue(root.get("active"));
 
         if (brandId != null) {
             spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("brand").get("id"), brandId));
@@ -75,6 +78,7 @@ public class ProductServiceImpl implements ProductService{
                 .name(product.getName())
                 .description(product.getDescription())
                 .price(product.getPrice())
+                .stock(product.getStock())
                 .pictureUrl(product.getPictureUrl())
                 .productType(product.getType().getName())
                 .productBrand(product.getBrand().getName())

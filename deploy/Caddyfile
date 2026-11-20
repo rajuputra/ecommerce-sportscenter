@@ -1,0 +1,39 @@
+{
+  auto_https off
+  admin off
+}
+
+:8080 {
+  encode zstd gzip
+  header {
+    X-Content-Type-Options nosniff
+    Referrer-Policy strict-origin-when-cross-origin
+    X-Frame-Options DENY
+  }
+
+  @api path /api /api/*
+  handle @api {
+    request_body {
+      max_size 64KB
+    }
+    reverse_proxy avero-api-internal:8081
+  }
+
+  handle /assets/* {
+    root * /srv
+    header Cache-Control "public, max-age=31536000, immutable"
+    file_server
+  }
+
+  handle /images/* {
+    root * /srv
+    file_server
+  }
+
+  handle {
+    root * /srv
+    header Cache-Control "no-cache"
+    try_files {path} /index.html
+    file_server
+  }
+}

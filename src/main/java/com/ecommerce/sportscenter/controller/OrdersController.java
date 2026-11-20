@@ -1,60 +1,42 @@
 package com.ecommerce.sportscenter.controller;
 
-import com.ecommerce.sportscenter.model.OrderDto;
-import com.ecommerce.sportscenter.model.OrderResponse;
+import com.ecommerce.sportscenter.entity.OrderAggregate.OrderStatus;
 import com.ecommerce.sportscenter.service.OrderService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.security.Principal;
 
 @RestController
 @RequestMapping("/api/orders")
 public class OrdersController {
-    private final OrderService orderService;
+    private final OrderService orders;
 
-    public OrdersController(OrderService orderService) {
-        this.orderService = orderService;
+    public OrdersController(OrderService orders) {
+        this.orders = orders;
     }
 
-    @GetMapping("/{orderId}")
-    public ResponseEntity<OrderResponse> getOrderById(@PathVariable Integer orderId){
-        OrderResponse order = orderService.getOrderById(orderId);
-        if(order!=null){
-            return ResponseEntity.ok(order);
-        }else{
-            return ResponseEntity.notFound().build();
-        }
-    }
     @GetMapping
-    public ResponseEntity<List<OrderResponse>> getAllOrders(){
-        List<OrderResponse> orders = orderService.getAllOrders();
-        return ResponseEntity.ok(orders);
+    public Page<OrderService.Summary> list(Principal principal, @RequestParam(defaultValue = "0") @Min(0) int page) {
+        return orders.list(principal.getName(), page);
     }
 
-    @GetMapping("/paged")
-    public ResponseEntity<Page<OrderResponse>> getAllOrdersPaged(Pageable pageable){
-        Page<OrderResponse> orders = orderService.getAllOrders(pageable);
-        return ResponseEntity.ok(orders);
+    @GetMapping("/{id}")
+    public OrderService.Detail detail(Principal principal, @PathVariable Integer id) {
+        return orders.detail(id, principal.getName());
     }
 
     @PostMapping
-    public ResponseEntity<Integer> createOrder(@Valid @RequestBody OrderDto orderDto){
-        Integer orderId = orderService.createOrder(orderDto);
-        if(orderId!=null){
-            return ResponseEntity.status(HttpStatus.CREATED).body(orderId);
-        }else{
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+    @ResponseStatus(HttpStatus.CREATED)
+    public Integer create(Principal principal, @Valid @RequestBody OrderService.Checkout checkout) {
+        return orders.create(principal.getName(), checkout);
     }
 
-    @DeleteMapping("/{orderId}")
-    public ResponseEntity<Void> deleteOrder(@PathVariable Integer orderId){
-        orderService.deleteOrder(orderId);
-        return ResponseEntity.noContent().build();
+    @PostMapping("/{id}/cancel")
+    public OrderService.Summary cancel(Principal principal, @PathVariable Integer id) {
+        return orders.changeStatus(id, principal.getName(), OrderStatus.Cancelled);
     }
 }

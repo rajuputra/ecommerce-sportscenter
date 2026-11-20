@@ -1,18 +1,11 @@
-import { Grid } from "@mui/material";
-import { Product } from "../../app/models/product";
+import type { Product } from "../../app/models/product";
 import ProductCard from "./ProductCard";
+import "./shop.css";
 
-interface Props {
-  products: Product[];
-}
-export default function ProductList({ products }: Props) {
+export default function ProductList({ products }: { products: Product[] }) {
   return (
-    <Grid container spacing={4}>
-      {products.map((product) => (
-        <Grid item xs={12} sm={6} md={4} lg={4} key={product.id}>
-          <ProductCard product={product} />
-        </Grid>
-      ))}
-    </Grid>
+    <ul className="av-product-grid">
+      {products.map(product => <li key={product.id}><ProductCard product={product} /></li>)}
+    </ul>
   );
 }

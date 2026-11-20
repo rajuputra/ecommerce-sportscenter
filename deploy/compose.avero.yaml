@@ -1,0 +1,11 @@
+services:
+  web:
+    networks:
+      default: {}
+      portfolio_proxy:
+        aliases: [avero-upstream]
+
+networks:
+  portfolio_proxy:
+    external: true
+    name: ${AVERO_PROXY_NETWORK:?Set AVERO_PROXY_NETWORK to the public Caddy network}
